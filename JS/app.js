@@ -1,6 +1,8 @@
+import { showToast } from "./toast.js";
+
 "use strict";
 
-const teams = [
+const demoTeams = [
   { name: "Chennai Super Kings", short: "CSK", slug: "csk", color: "#f6c443", city: "Chennai", ground: "M. A. Chidambaram Stadium" },
   { name: "Mumbai Indians", short: "MI", slug: "mi", color: "#3d8cff", city: "Mumbai", ground: "Wankhede Stadium" },
   { name: "Royal Challengers Bengaluru", short: "RCB", slug: "rcb", color: "#ed3d51", city: "Bengaluru", ground: "M. Chinnaswamy Stadium" },
@@ -13,7 +15,9 @@ const teams = [
   { name: "Lucknow Super Giants", short: "LSG", slug: "lsg", color: "#58d2df", city: "Lucknow", ground: "BRSABV Ekana Cricket Stadium" }
 ];
 
-const matches = [
+let teams = demoTeams;
+
+const demoMatches = [
   { home: "RCB", away: "CSK", venue: "M. Chinnaswamy Stadium", city: "Bengaluru" },
   { home: "MI", away: "KKR", venue: "Wankhede Stadium", city: "Mumbai" },
   { home: "SRH", away: "GT", venue: "Rajiv Gandhi International Cricket Stadium", city: "Hyderabad" },
@@ -24,7 +28,29 @@ const matches = [
   { home: "KKR", away: "SRH", venue: "Eden Gardens", city: "Kolkata" }
 ];
 
-const teamByShort = new Map(teams.map(team => [team.short, team]));
+const demoTicketCategories = [
+  { id: "900", name: "General Stand", price: 900, availableSeats: null },
+  { id: "1800", name: "Premium Stand", price: 1800, availableSeats: null },
+  { id: "3200", name: "VIP Lounge", price: 3200, availableSeats: null }
+];
+let matches = demoMatches.map((match, index) => ({
+  ...match,
+  id: String(index),
+  matchDate: "",
+  matchNumber: index + 1,
+  status: "upcoming",
+  title: "",
+  categories: demoTicketCategories
+}));
+
+const demoStadiums = [
+  { name: "Wankhede Stadium", city: "Mumbai", capacity: "A sea of blue, right by the coast" },
+  { name: "M. A. Chidambaram Stadium", city: "Chennai", capacity: "A fortress with a roaring yellow wall" },
+  { name: "M. Chinnaswamy Stadium", city: "Bengaluru", capacity: "Big-city energy, boundary after boundary" },
+  { name: "Narendra Modi Stadium", city: "Ahmedabad", capacity: "A grand stage for a massive crowd" }
+];
+let stadiums = demoStadiums;
+let teamByShort = new Map(teams.map(team => [team.short, team]));
 const feeRate = 0.05;
 const bookingStorageKey = "ipl-ticket-arena-demo-bookings";
 let activeTeamFilter = "";
@@ -47,11 +73,39 @@ function formatRupees(amount) {
   return `₹${numberFormat.format(amount)}`;
 }
 
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[character]);
+}
+
+function getTeam(shortName) {
+  return teamByShort.get(shortName) || {
+    name: "Team TBA",
+    short: shortName || "TBA",
+    slug: "",
+    color: "#8797ae",
+    city: "",
+    ground: "",
+    logoUrl: ""
+  };
+}
+
 function getTeamLogo(team, extraClass = "") {
+  const logoUrl = team.logoUrl || (team.slug ? `img/${team.slug}.svg` : "");
+  const logo = logoUrl
+    ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(team.name)} logo" loading="lazy">`
+    : "";
+  const unavailableClass = logoUrl ? "" : " logo-unavailable";
+
   return `
-    <span class="team-mark ${extraClass}" style="--team-color:${team.color}">
-      <img src="img/${team.slug}.svg" alt="${team.name} logo" loading="lazy">
-      <span class="logo-fallback" aria-hidden="true">${team.short}</span>
+    <span class="team-mark ${extraClass}${unavailableClass}" style="--team-color:${escapeHtml(team.color)}">
+      ${logo}
+      <span class="logo-fallback" aria-hidden="true">${escapeHtml(team.short)}</span>
     </span>
   `;
 }
@@ -67,12 +121,12 @@ function attachLogoFallbacks(container) {
 
 function renderTeams() {
   teamsGrid.innerHTML = teams.map(team => `
-    <article class="team-card" style="--team-color:${team.color}">
-      <div class="team-card-top"><span class="team-card-index">${team.short}</span><span class="team-spark" aria-hidden="true">✦</span></div>
+    <article class="team-card" style="--team-color:${escapeHtml(team.color)}">
+      <div class="team-card-top"><span class="team-card-index">${escapeHtml(team.short)}</span><span class="team-spark" aria-hidden="true">✦</span></div>
       ${getTeamLogo(team)}
-      <h3>${team.name}</h3>
-      <p class="team-city">${team.city}</p>
-      <button class="team-match-link" type="button" data-team="${team.short}">
+      <h3>${escapeHtml(team.name)}</h3>
+      <p class="team-city">${escapeHtml(team.city)}</p>
+      <button class="team-match-link" type="button" data-team="${escapeHtml(team.short)}">
         View matches <span aria-hidden="true">↗</span>
       </button>
     </article>
@@ -80,42 +134,170 @@ function renderTeams() {
   attachLogoFallbacks(teamsGrid);
 }
 
-function renderMatches() {
-  const visibleMatches = matches
-    .map((match, index) => ({ ...match, index }))
-    .filter(match => !activeTeamFilter || match.home === activeTeamFilter || match.away === activeTeamFilter);
+function renderStadiums() {
+  const stadiumGrid = document.getElementById("stadiumGrid");
+  stadiumGrid.innerHTML = stadiums.map((stadium, index) => `
+    <article class="stadium-card">
+      <span class="stadium-number">${String(index + 1).padStart(2, "0")}</span>
+      <span class="stadium-pin" aria-hidden="true">⌖</span>
+      <h3>${escapeHtml(stadium.name)}</h3>
+      <p>${escapeHtml(stadium.city)}</p>
+      <span class="stadium-capacity">${escapeHtml(stadium.capacity)}</span>
+    </article>
+  `).join("");
+}
 
-  matchGrid.innerHTML = visibleMatches.map(match => {
-    const home = teamByShort.get(match.home);
-    const away = teamByShort.get(match.away);
-    const matchNumber = String(match.index + 1).padStart(2, "0");
+async function loadSupabaseData() {
+  const client = window.supabaseClient;
+  if (!client) {
+    throw new Error("Supabase client is not configured.");
+  }
+
+  const [teamResult, stadiumResult, matchResult, categoryResult] = await Promise.all([
+    client.from("teams").select("id,team_name,short_name,logo_url").order("team_name"),
+    client.from("stadiums").select("id,stadium_name,city,capacity").order("stadium_name"),
+    client.from("matches")
+      .select("id,team1_id,team2_id,stadium_id,match_title,match_date,match_number,status")
+      .order("match_date"),
+    client.from("ticket_categories")
+      .select("id,match_id,category_name,price,total_seats,available_seats")
+      .order("price")
+  ]);
+
+  if (teamResult.error) throw new Error(`Could not load teams: ${teamResult.error.message}`);
+  if (stadiumResult.error) throw new Error(`Could not load stadiums: ${stadiumResult.error.message}`);
+  if (matchResult.error) throw new Error(`Could not load matches: ${matchResult.error.message}`);
+  if (categoryResult.error) throw new Error(`Could not load ticket categories: ${categoryResult.error.message}`);
+  if (!teamResult.data.length || !stadiumResult.data.length || !matchResult.data.length) {
+    document.getElementById("databaseMessage").textContent =
+      "Supabase is connected, but teams, stadiums, or matches have no records. Showing demo data until records are added.";
+    return;
+  }
+
+  const loadedTeams = teamResult.data.map(team => {
+    const displayDetails = demoTeams.find(item => item.short === team.short_name);
+    return {
+      ...displayDetails,
+      id: team.id,
+      name: team.team_name,
+      short: team.short_name,
+      slug: String(team.short_name).toLowerCase(),
+      logoUrl: team.logo_url || "",
+      color: displayDetails ? displayDetails.color : "#3184ff",
+      city: displayDetails ? displayDetails.city : "",
+      ground: displayDetails ? displayDetails.ground : ""
+    };
+  });
+  const teamsById = new Map(loadedTeams.map(team => [team.id, team]));
+  const loadedStadiums = stadiumResult.data.map(stadium => ({
+    name: stadium.stadium_name,
+    city: stadium.city,
+    capacity: `${Number(stadium.capacity).toLocaleString("en-IN")} seats`
+  }));
+  const stadiumsById = new Map(stadiumResult.data.map(stadium => [stadium.id, stadium]));
+  const categoriesByMatch = new Map();
+
+  categoryResult.data.forEach(category => {
+    if (!categoriesByMatch.has(category.match_id)) {
+      categoriesByMatch.set(category.match_id, []);
+    }
+    categoriesByMatch.get(category.match_id).push({
+      id: category.id,
+      name: category.category_name,
+      price: Number(category.price),
+      availableSeats: Number(category.available_seats)
+    });
+  });
+
+  const loadedMatches = matchResult.data.map((match, index) => {
+    const home = teamsById.get(match.team1_id);
+    const away = teamsById.get(match.team2_id);
+    const stadium = stadiumsById.get(match.stadium_id);
+    return {
+      id: match.id,
+      home: home ? home.short : "TBA",
+      away: away ? away.short : "TBA",
+      venue: stadium ? stadium.stadium_name : "Venue TBA",
+      city: stadium ? stadium.city : "",
+      matchDate: match.match_date,
+      matchNumber: match.match_number || index + 1,
+      status: match.status || "upcoming",
+      title: match.match_title || "",
+      categories: categoriesByMatch.get(match.id) || []
+    };
+  });
+
+  teams = loadedTeams;
+  teamByShort = new Map(teams.map(team => [team.short, team]));
+  stadiums = loadedStadiums;
+  matches = loadedMatches;
+  activeTeamFilter = "";
+  document.getElementById("matchFilter").hidden = true;
+  document.getElementById("fixtureNoticeText").textContent =
+    "Match, stadium, and ticket category details are read from Supabase. Bookings remain demo-only.";
+  document.getElementById("ticketPriceNote").textContent =
+    "Ticket prices are read from Supabase. This form does not create a real booking.";
+  document.getElementById("matchListingStatus").textContent = "LIVE DATABASE DATA";
+  document.getElementById("databaseMessage").classList.remove("is-error");
+  document.getElementById("databaseMessage").textContent = categoryResult.data.length
+    ? "Public IPL data loaded from Supabase."
+    : "Public match data loaded, but no ticket categories are available yet.";
+
+  renderTeams();
+  renderStadiums();
+  renderMatches();
+  populateMatchSelect();
+  populateTicketCategories();
+  renderSelectedMatch();
+  updatePriceBreakdown();
+}
+
+function formatMatchDate(date) {
+  if (!date) return "Fixture date TBA";
+  const parsedDate = new Date(date);
+  if (Number.isNaN(parsedDate.getTime())) return "Fixture date TBA";
+  return parsedDate.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+}
+
+function renderMatches() {
+  const visibleMatches = matches.filter(match =>
+    !activeTeamFilter || match.home === activeTeamFilter || match.away === activeTeamFilter
+  );
+
+  matchGrid.innerHTML = visibleMatches.map((match, index) => {
+    const home = getTeam(match.home);
+    const away = getTeam(match.away);
+    const matchNumber = String(match.matchNumber || index + 1).padStart(2, "0");
 
     return `
       <article class="match-card">
         <div class="match-card-head">
-          <span class="match-number">DEMO MATCH <b>${matchNumber}</b></span>
-          <span class="demo-status"><span class="live-dot"></span> SAMPLE</span>
+          <span class="match-number">${escapeHtml(match.title || "MATCH")} <b>${matchNumber}</b></span>
+          <span class="demo-status"><span class="live-dot"></span> ${escapeHtml(match.status.toUpperCase())}</span>
         </div>
         <div class="match-versus">
           <div class="match-team">
             ${getTeamLogo(home)}
-            <h3>${home.name}</h3>
-            <span class="match-short">${home.short}</span>
+            <h3>${escapeHtml(home.name)}</h3>
+            <span class="match-short">${escapeHtml(home.short)}</span>
           </div>
           <span class="versus-divider"><span>VS</span></span>
           <div class="match-team">
             ${getTeamLogo(away)}
-            <h3>${away.name}</h3>
-            <span class="match-short">${away.short}</span>
+            <h3>${escapeHtml(away.name)}</h3>
+            <span class="match-short">${escapeHtml(away.short)}</span>
           </div>
         </div>
         <div class="match-details">
-          <div><span class="detail-icon" aria-hidden="true">◷</span><span><strong>Fixture TBA</strong><small>Time TBA</small></span></div>
-          <div><span class="detail-icon" aria-hidden="true">⌖</span><span><strong>${match.venue}</strong><small>${match.city}</small></span></div>
+          <div><span class="detail-icon" aria-hidden="true">◷</span><span><strong>${escapeHtml(formatMatchDate(match.matchDate))}</strong><small>${escapeHtml(match.status)}</small></span></div>
+          <div><span class="detail-icon" aria-hidden="true">⌖</span><span><strong>${escapeHtml(match.venue)}</strong><small>${escapeHtml(match.city)}</small></span></div>
         </div>
         <div class="match-card-bottom">
-          <span class="match-placeholder">Dates &amp; prices are demo placeholders</span>
-          <button class="button button-small" type="button" data-book-match="${match.index}">Book Tickets <span aria-hidden="true">↗</span></button>
+          <span class="match-placeholder">Read-only schedule · Demo booking only</span>
+          <button class="button button-small" type="button" data-book-match="${escapeHtml(match.id)}">Book Tickets <span aria-hidden="true">↗</span></button>
         </div>
       </article>
     `;
@@ -125,16 +307,47 @@ function renderMatches() {
 }
 
 function populateMatchSelect() {
-  matchSelect.innerHTML = matches.map((match, index) => {
-    const home = teamByShort.get(match.home);
-    const away = teamByShort.get(match.away);
-    return `<option value="${index}">${home.name} vs ${away.name} · Demo matchup</option>`;
+  matchSelect.innerHTML = matches.map(match => {
+    const home = getTeam(match.home);
+    const away = getTeam(match.away);
+    return `<option value="${escapeHtml(match.id)}">${escapeHtml(home.name)} vs ${escapeHtml(away.name)}</option>`;
   }).join("");
+
+  if (!matches.length) {
+    matchSelect.innerHTML = '<option value="" selected disabled>No matches are available</option>';
+  }
+}
+
+function populateTicketCategories() {
+  const match = getSelectedMatch();
+  const categories = match
+    ? match.categories.filter(category => category.availableSeats === null || category.availableSeats > 0)
+    : [];
+  ticketType.replaceChildren();
+
+  if (!categories.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No ticket categories available";
+    option.disabled = true;
+    option.selected = true;
+    ticketType.append(option);
+    ticketType.disabled = true;
+    return;
+  }
+
+  ticketType.disabled = false;
+  categories.forEach(category => {
+    const option = document.createElement("option");
+    option.value = category.id;
+    const availability = category.availableSeats === null ? "" : ` · ${category.availableSeats} available`;
+    option.textContent = `${category.name} · ${formatRupees(category.price)}${availability}`;
+    ticketType.append(option);
+  });
 }
 
 function getSelectedMatch() {
-  const index = Number(matchSelect.value);
-  return Number.isInteger(index) ? matches[index] : undefined;
+  return matches.find(match => match.id === matchSelect.value);
 }
 
 function renderSelectedMatch() {
@@ -146,22 +359,24 @@ function renderSelectedMatch() {
     return;
   }
 
-  const home = teamByShort.get(match.home);
-  const away = teamByShort.get(match.away);
+  const home = getTeam(match.home);
+  const away = getTeam(match.away);
   preview.innerHTML = `
     <div class="preview-teams">
-      <div>${getTeamLogo(home, "team-mark-small")}<span>${home.short}</span></div>
+      <div>${getTeamLogo(home, "team-mark-small")}<span>${escapeHtml(home.short)}</span></div>
       <span class="preview-vs">VS</span>
-      <div>${getTeamLogo(away, "team-mark-small")}<span>${away.short}</span></div>
+      <div>${getTeamLogo(away, "team-mark-small")}<span>${escapeHtml(away.short)}</span></div>
     </div>
-    <div class="preview-venue"><span aria-hidden="true">⌖</span> ${match.venue}, ${match.city}</div>
-    <span class="preview-date">Sample matchup · Fixture date and time TBA</span>
+    <div class="preview-venue"><span aria-hidden="true">⌖</span> ${escapeHtml(match.venue)}, ${escapeHtml(match.city)}</div>
+    <span class="preview-date">${escapeHtml(formatMatchDate(match.matchDate))}</span>
   `;
   attachLogoFallbacks(preview);
 }
 
 function updatePriceBreakdown() {
-  const price = Number(ticketType.value);
+  const match = getSelectedMatch();
+  const category = match && match.categories.find(item => item.id === ticketType.value);
+  const price = category ? category.price : 0;
   const quantity = Number(quantitySelect.value);
   const subtotal = price * quantity;
   const fee = Math.round(subtotal * feeRate);
@@ -174,14 +389,15 @@ function updatePriceBreakdown() {
 
 function showMatchFilter(teamShort) {
   activeTeamFilter = teamShort;
-  const team = teamByShort.get(teamShort);
+  const team = getTeam(teamShort);
   const matchFilter = document.getElementById("matchFilter");
   matchFilter.hidden = false;
-  document.getElementById("matchFilterLabel").textContent = `Sample matchups featuring ${team.name}`;
+  document.getElementById("matchFilterLabel").textContent = `Matchups featuring ${team.name}`;
 
-  const firstMatchIndex = matches.findIndex(match => match.home === teamShort || match.away === teamShort);
-  if (firstMatchIndex !== -1) {
-    matchSelect.value = String(firstMatchIndex);
+  const firstMatch = matches.find(match => match.home === teamShort || match.away === teamShort);
+  if (firstMatch) {
+    matchSelect.value = firstMatch.id;
+    populateTicketCategories();
     renderSelectedMatch();
     updatePriceBreakdown();
   }
@@ -190,13 +406,16 @@ function showMatchFilter(teamShort) {
   document.getElementById("matches").scrollIntoView({ behavior: "smooth" });
 }
 
-function goToBooking(matchIndex) {
-  if (Number.isInteger(matchIndex) && matches[matchIndex]) {
-    matchSelect.value = String(matchIndex);
+function goToBooking(matchId) {
+  const match = matches.find(item => item.id === matchId);
+  if (match) {
+    matchSelect.value = match.id;
+    populateTicketCategories();
     renderSelectedMatch();
     updatePriceBreakdown();
   }
   document.getElementById("booking").scrollIntoView({ behavior: "smooth" });
+  showToast("Your matchup is selected. Complete the booking form below.");
 }
 
 function setBookingMessage(message, type = "") {
@@ -217,16 +436,16 @@ function addReviewRow(label, value, isTotal = false) {
 
 function openBookingReview() {
   const match = getSelectedMatch();
-  if (!match) {
-    setBookingMessage("Please select a demo matchup before continuing.", "error");
+  const category = match && match.categories.find(item => item.id === ticketType.value);
+  if (!match || !category) {
+    setBookingMessage("Please choose a match and an available ticket category before continuing.", "error");
     return;
   }
 
-  const home = teamByShort.get(match.home);
-  const away = teamByShort.get(match.away);
-  const subtotal = Number(ticketType.value) * Number(quantitySelect.value);
+  const home = getTeam(match.home);
+  const away = getTeam(match.away);
+  const subtotal = category.price * Number(quantitySelect.value);
   const fee = Math.round(subtotal * feeRate);
-  const category = ticketType.options[ticketType.selectedIndex].text.split(" · ")[0];
 
   pendingBooking = {
     id: `IPL-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
@@ -238,8 +457,8 @@ function openBookingReview() {
     awayShort: away.short,
     venue: match.venue,
     city: match.city,
-    date: "Fixture date and time TBA",
-    category,
+    date: formatMatchDate(match.matchDate),
+    category: category.name,
     quantity: Number(quantitySelect.value),
     subtotal,
     fee,
@@ -250,8 +469,8 @@ function openBookingReview() {
   reviewSummary.replaceChildren();
   addReviewRow("Matchup", `${home.name} vs ${away.name}`);
   addReviewRow("Venue · demo", `${match.venue}, ${match.city}`);
-  addReviewRow("Schedule", "Fixture date and time TBA");
-  addReviewRow("Tickets", `${pendingBooking.quantity} × ${category}`);
+  addReviewRow("Schedule", formatMatchDate(match.matchDate));
+  addReviewRow("Tickets", `${pendingBooking.quantity} × ${category.name}`);
   addReviewRow("Ticket subtotal", formatRupees(subtotal));
   addReviewRow("Demo service fee", formatRupees(fee));
   addReviewRow("Estimated total", formatRupees(pendingBooking.total), true);
@@ -341,6 +560,7 @@ function savePendingBooking() {
     renderSavedBookings();
     reviewDialog.close();
     bookingForm.reset();
+    populateTicketCategories();
     renderSelectedMatch();
     updatePriceBreakdown();
     setBookingMessage(`Demo booking ${pendingBooking.id} was saved in this browser. No tickets were reserved or issued.`, "success");
@@ -427,7 +647,13 @@ teamsGrid.addEventListener("click", event => {
 
 matchGrid.addEventListener("click", event => {
   const button = event.target.closest("[data-book-match]");
-  if (button) goToBooking(Number(button.dataset.bookMatch));
+  if (button) goToBooking(button.dataset.bookMatch);
+});
+
+document.querySelectorAll('a[href="#booking"]').forEach(link => {
+  link.addEventListener("click", () => {
+    showToast("Opening the booking form.");
+  });
 });
 
 document.getElementById("clearMatchFilter").addEventListener("click", () => {
@@ -436,7 +662,11 @@ document.getElementById("clearMatchFilter").addEventListener("click", () => {
   renderMatches();
 });
 
-matchSelect.addEventListener("change", renderSelectedMatch);
+matchSelect.addEventListener("change", () => {
+  populateTicketCategories();
+  renderSelectedMatch();
+  updatePriceBreakdown();
+});
 ticketType.addEventListener("change", updatePriceBreakdown);
 quantitySelect.addEventListener("change", updatePriceBreakdown);
 
@@ -463,10 +693,18 @@ document.getElementById("bookingsList").addEventListener("click", event => {
 });
 
 renderTeams();
+renderStadiums();
 renderMatches();
 populateMatchSelect();
+populateTicketCategories();
 renderSelectedMatch();
 updatePriceBreakdown();
 savedBookings = readSavedBookings();
 renderSavedBookings();
 initializeNavigation();
+loadSupabaseData().catch(error => {
+  console.error("Could not load public Supabase data; showing the demo data.", error);
+  const databaseMessage = document.getElementById("databaseMessage");
+  databaseMessage.classList.add("is-error");
+  databaseMessage.textContent = "Could not load live data from Supabase. Showing demo data instead.";
+});

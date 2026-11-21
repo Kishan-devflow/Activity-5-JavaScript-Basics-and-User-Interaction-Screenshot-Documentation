@@ -8,7 +8,9 @@
   <title>IPL Arena | Experience Matchday</title>
   <link rel="icon" href="img/ipl-brand.png" type="image/png">
   <link rel="stylesheet" href="CSS/styles.css">
-  <script src="JS/app.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="superbase.js"></script>
+  <script type="module" src="JS/app.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -75,12 +77,13 @@
           <h2 id="matchesTitle">Matchday <span class="text-blue">lineup</span></h2>
           <p>Pick a matchup and start your demo booking. Let the anticipation build.</p>
         </div>
-        <span class="section-side-note"><span class="live-dot"></span> SAMPLE LISTINGS</span>
+        <span class="section-side-note"><span class="live-dot"></span> <span id="matchListingStatus">SAMPLE LISTINGS</span></span>
       </div>
       <div class="demo-notice" role="note">
         <span class="notice-icon" aria-hidden="true">i</span>
-        <p><strong>Fixture notice:</strong> These are illustrative demo pairings, not an official IPL schedule. Dates, times, venues and prices are placeholders.</p>
+        <p id="fixtureNoticeText"><strong>Fixture notice:</strong> These are illustrative demo pairings, not an official IPL schedule. Dates, times, venues and prices are placeholders.</p>
       </div>
+      <p class="storage-message" id="databaseMessage" role="status" aria-live="polite"></p>
       <div class="match-filter" id="matchFilter" hidden>
         <span id="matchFilterLabel"></span>
         <button type="button" id="clearMatchFilter">Show all matchups <span aria-hidden="true">×</span></button>
@@ -111,36 +114,7 @@
             <p>A few of the legendary grounds that bring Indian cricket to life.</p>
           </div>
         </div>
-        <div class="stadium-grid">
-          <article class="stadium-card">
-            <span class="stadium-number">01</span>
-            <span class="stadium-pin" aria-hidden="true">⌖</span>
-            <h3>Wankhede Stadium</h3>
-            <p>Mumbai · Maharashtra</p>
-            <span class="stadium-capacity">A sea of blue, right by the coast</span>
-          </article>
-          <article class="stadium-card">
-            <span class="stadium-number">02</span>
-            <span class="stadium-pin" aria-hidden="true">⌖</span>
-            <h3>M. A. Chidambaram Stadium</h3>
-            <p>Chennai · Tamil Nadu</p>
-            <span class="stadium-capacity">A fortress with a roaring yellow wall</span>
-          </article>
-          <article class="stadium-card">
-            <span class="stadium-number">03</span>
-            <span class="stadium-pin" aria-hidden="true">⌖</span>
-            <h3>M. Chinnaswamy Stadium</h3>
-            <p>Bengaluru · Karnataka</p>
-            <span class="stadium-capacity">Big-city energy, boundary after boundary</span>
-          </article>
-          <article class="stadium-card">
-            <span class="stadium-number">04</span>
-            <span class="stadium-pin" aria-hidden="true">⌖</span>
-            <h3>Narendra Modi Stadium</h3>
-            <p>Ahmedabad · Gujarat</p>
-            <span class="stadium-capacity">A grand stage for a massive crowd</span>
-          </article>
-        </div>
+        <div class="stadium-grid" id="stadiumGrid"></div>
       </div>
     </section>
 
@@ -159,7 +133,7 @@
           <form class="booking-form" id="bookingForm">
             <div class="form-title">
               <span class="form-icon" aria-hidden="true">✦</span>
-              <div><h3>Build your booking</h3><p>All prices shown are demo estimates in INR.</p></div>
+              <div><h3>Build your booking</h3><p id="ticketPriceNote">All prices shown are demo estimates in INR.</p></div>
             </div>
 
             <div class="form-field">
@@ -172,11 +146,7 @@
             <div class="form-row">
               <div class="form-field">
                 <label for="ticketType">Seating category</label>
-                <select id="ticketType" name="ticketType">
-                  <option value="900">General Stand · ₹900</option>
-                  <option value="1800">Premium Stand · ₹1,800</option>
-                  <option value="3200">VIP Lounge · ₹3,200</option>
-                </select>
+                <select id="ticketType" name="ticketType" required></select>
               </div>
               <div class="form-field">
                 <label for="quantity">Tickets</label>
@@ -346,5 +316,6 @@
       <button class="button" type="button" id="saveBookingButton">Save demo booking <span aria-hidden="true">→</span></button>
     </div>
   </dialog>
+  <div class="toast-message" id="toastMessage" role="status" aria-live="polite"></div>
 </body>
 </html>
